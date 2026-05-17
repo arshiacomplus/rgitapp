@@ -29,8 +29,17 @@ jobs:
         with:
           gradle-version: '8.4'
       
-      - name: Build APKs
-        run: gradle assembleRelease -x test
+      - name: Decode Keystore
+        run: echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > rgit-release.jks
+
+      - name: Build and Sign APKs
+        # * Inject signing configurations dynamically via Gradle properties
+        run: |
+          gradle assembleRelease -x test \
+            -Pandroid.injected.signing.store.file=$(pwd)/rgit-release.jks \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEY_STORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
