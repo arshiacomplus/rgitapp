@@ -11,8 +11,8 @@ android {
         applicationId = "com.arshiacomplus.rgit"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.0.2"
     }
 
     buildTypes {
