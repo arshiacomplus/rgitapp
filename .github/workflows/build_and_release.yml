@@ -20,23 +20,22 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
 
       - name: Build Release APKs (Skip Tests)
-        # * -x test explicitly ignores all testing steps to save time
-        run: ./gradlew assembleRelease -x test
+        # * Call gradle directly instead of local gradlew wrapper
+        run: gradle assembleRelease -x test
 
       - name: Organize and Rename APKs
         run: |
           mkdir -p output_apks
-          # * Find all generated release APKs and copy them to output_apks folder
           find app/build/outputs/apk/release -name "*.apk" -exec cp {} output_apks/ \;
           cd output_apks
 
-          # * Rename files for a cleaner release (e.g., app-arm64-v8a-release.apk -> rgit-arm64-v8a.apk)
           for file in *.apk; do
             new_name=$(echo "$file" | sed 's/app-/rgit-/g' | sed 's/-release//g' | sed 's/-unsigned//g')
             mv "$file" "$new_name"
