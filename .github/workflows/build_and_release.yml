@@ -1,10 +1,16 @@
 name: Build and Release RGit
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release Tag (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      notes:
+        description: 'Release Notes/Description'
+        required: true
+        default: 'New release of RGit'
 
 jobs:
   build:
@@ -27,7 +33,6 @@ jobs:
           gradle-version: '8.4'
 
       - name: Build Release APKs (Skip Tests)
-        # * Call gradle directly instead of local gradlew wrapper
         run: gradle assembleRelease -x test
 
       - name: Organize and Rename APKs
@@ -46,7 +51,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_PAT }}
         with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: Release ${{ github.event.inputs.tag }}
+          body: ${{ github.event.inputs.notes }}
           files: output_apks/*.apk
           draft: false
           prerelease: false
-          generate_release_notes: true
