@@ -41,7 +41,7 @@ jobs:
             mv "$file" "$new_name"
           done
 
-      - name: Publish Release (as micro-acp)
+      - name: Publish Release
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_PAT }}
