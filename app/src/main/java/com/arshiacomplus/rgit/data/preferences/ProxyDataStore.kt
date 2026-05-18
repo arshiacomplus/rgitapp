@@ -17,7 +17,7 @@ class ProxyDataStore(private val context: Context) {
         val PROXY_IP = stringPreferencesKey("proxy_ip")
         val PROXY_PORT = intPreferencesKey("proxy_port")
         val THREAD_COUNT = intPreferencesKey("thread_count")
-        val GIT_REPO_URL = stringPreferencesKey("git_repo_url")
+        val REPO_URL = stringPreferencesKey("repo_url")
     }
 
     val proxySettingsFlow: Flow<AppConfig> = context.dataStore.data
@@ -27,7 +27,7 @@ class ProxyDataStore(private val context: Context) {
                 ip = preferences[PROXY_IP] ?: "127.0.0.1",
                 port = preferences[PROXY_PORT] ?: 10808,
                 threads = preferences[THREAD_COUNT] ?: 4,
-                repoUrl = preferences[GIT_REPO_URL] ?: ""
+                repoUrl = preferences[REPO_URL] ?: ""
             )
         }
 
@@ -37,7 +37,7 @@ class ProxyDataStore(private val context: Context) {
             preferences[PROXY_IP] = ip
             preferences[PROXY_PORT] = port
             preferences[THREAD_COUNT] = threads
-            preferences[GIT_REPO_URL] = repoUrl
+            preferences[REPO_URL] = repoUrl
         }
     }
 }

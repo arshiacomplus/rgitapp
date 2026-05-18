@@ -308,6 +308,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
             onSave = { enabled, ip, port, threads, savedRepo ->
                 scope.launch {
                     proxyDataStore.saveProxyConfig(enabled, ip, port, threads, savedRepo)
+                    repoUrl = savedRepo
                     showProxyDialog = false
                 }
             }
@@ -325,7 +326,7 @@ fun SettingsDialog(
     var ip by remember { mutableStateOf(currentConfig.ip) }
     var port by remember { mutableStateOf(currentConfig.port.toString()) }
     var threads by remember { mutableStateOf(currentConfig.threads.toFloat()) }
-    // var repoUrl by remember { mutableStateOf(currentConfig.repoUrl) }
+    var repoUrlState by remember { mutableStateOf(currentConfig.repoUrl) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -350,8 +351,8 @@ fun SettingsDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
-                    value = repoUrl,
-                    onValueChange = { repoUrl = it },
+                    value = repoUrlState, // * Use the state variable
+                    onValueChange = { repoUrlState = it },
                     label = { Text("Default Git Repo URL") }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -370,7 +371,7 @@ fun SettingsDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onSave(isEnabled, ip, port.toIntOrNull() ?: 10808, threads.toInt(), repoUrl)
+                onSave(isEnabled, ip, port.toIntOrNull() ?: 10808, threads.toInt(), repoUrlState)
             }) {
                 Text("Save", color = GhButtonBlue)
             }
