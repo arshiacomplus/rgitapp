@@ -33,7 +33,7 @@ class RGitDownloader {
         val client = clientBuilder.build()
         val downloadDir = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            "rgiT"
+            "Rgit"
         )
         if (!downloadDir.exists()) {
             downloadDir.mkdirs()

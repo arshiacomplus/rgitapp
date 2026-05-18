@@ -339,7 +339,7 @@ private fun openFileManagerSafe(context: Context, autoUnzip: Boolean, targetFile
         } else {
             val downloadDir = File(
                 android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
-                "rgiT"
+                "Rgit"
             )
             val uri = android.net.Uri.fromFile(downloadDir)
             intent.setDataAndType(uri, "*/*")
