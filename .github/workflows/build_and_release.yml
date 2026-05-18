@@ -8,7 +8,7 @@ on:
         required: true
         default: 'v1.0.0'
       release_body:
-        description: 'Release notes'
+        description: 'Release notes (Use \n for new lines)'
         required: true
         default: 'Automated release'
 
@@ -72,14 +72,32 @@ jobs:
           name: release-apks
           path: artifacts
 
+      - name: Rename APKs
+        env:
+          APP_NAME: "MyAppName"
+          TAG_NAME: ${{ github.event.inputs.tag_name }}
+        run: |
+          cd artifacts
+          for file in *.apk; do
+            if [ -f "$file" ]; then
+
+              ARCH=$(echo "$file" | sed 's/^app-//;s/-release\.apk$//;s/\.apk$//')
+
+              if [ "$ARCH" = "" ] || [ "$ARCH" = "release" ] || [ "$ARCH" = "app" ]; then
+                ARCH="Universal"
+              fi
+
+              NEW_NAME="${APP_NAME} - ${TAG_NAME} - ${ARCH}.apk"
+              mv "$file" "$NEW_NAME"
+              echo "file name changed to: $NEW_NAME"
+            fi
+          done
+
       - name: Format Release Notes
         shell: bash
         run: |
-          cat << 'EOF' > release_notes_raw.txt
-          ${{ github.event.inputs.release_body }}
-          EOF
+          echo -e "${{ github.event.inputs.release_body }}" > release_notes.txt
 
-          sed 's/|/\n/g' release_notes_raw.txt > release_notes.txt
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
