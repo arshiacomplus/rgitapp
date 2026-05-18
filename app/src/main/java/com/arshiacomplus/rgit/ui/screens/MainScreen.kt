@@ -49,10 +49,9 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
     var showProxyDialog by remember { mutableStateOf(false) }
     var downloadFinished by remember { mutableStateOf(false) }
 
-
     var finalFileToOpen by remember { mutableStateOf<File?>(null) }
 
-    val proxyConfig by proxyDataStore.proxySettingsFlow.collectAsState(initial = null)
+    val appConfig by proxyDataStore.proxySettingsFlow.collectAsState(initial = null)
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -62,78 +61,84 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
             isDownloading = true
             downloadFinished = false
             progress = 0
-
             currentFileStatus = "Starting..."
             finalFileToOpen = null
 
             scope.launch {
-                val downloader = RGitDownloader()
-                val extractor = ZipExtractor()
-                val count = if (isSplit) partsCount.toIntOrNull() ?: 1 else 1
+                try {
+                    val downloader = RGitDownloader()
+                    val extractor = ZipExtractor()
+                    val count = if (isSplit) partsCount.toIntOrNull() ?: 1 else 1
 
-                val downloadedFiles = downloader.startDownload(
-                    originalUrl = url,
-                    partsCount = count,
-                    proxyConfig = proxyConfig ?: return@launch,
-                    onProgress = { p, fileName ->
-                        progress = p
-                        currentFileStatus = "Downloading $fileName..."
-                    }
-                )
+                    val downloadedFiles = downloader.startDownload(
+                        originalUrl = url,
+                        partsCount = count,
+                        appConfig = appConfig ?: throw Exception("Config not loaded"),
+                        onProgress = { p, fileName ->
+                            progress = p
+                            currentFileStatus = "Downloading $fileName..."
+                        }
+                    )
 
-                if (downloadedFiles != null && downloadedFiles.isNotEmpty()) {
-                    var finalFile = downloadedFiles.first()
+                    if (downloadedFiles.isNotEmpty()) {
+                        var finalFile = downloadedFiles.first()
 
+                        if (isSplit && downloadedFiles.size > 1) {
+                            currentFileStatus = "Combining parts..."
+                            val regex = Regex("\\.\\d{3,}\$")
+                            val baseName = finalFile.name.replace(regex, "")
+                            val combinedFile = File(finalFile.parentFile, baseName)
 
-                    if (isSplit && downloadedFiles.size > 1) {
-                        currentFileStatus = "Combining parts..."
-                        val regex = Regex("\\.\\d{3,}\$") // Removes .001, .002, etc.
-                        val baseName = finalFile.name.replace(regex, "")
-                        val combinedFile = File(finalFile.parentFile, baseName)
-
-                        val combined = withContext(Dispatchers.IO) {
-                            try {
-                                FileOutputStream(combinedFile).use { out ->
-                                    for (part in downloadedFiles) {
-                                        FileInputStream(part).use { input ->
-                                            input.copyTo(out)
+                            val combined = withContext(Dispatchers.IO) {
+                                try {
+                                    FileOutputStream(combinedFile).use { out ->
+                                        for (part in downloadedFiles) {
+                                            FileInputStream(part).use { input ->
+                                                input.copyTo(out)
+                                            }
                                         }
                                     }
+                                    downloadedFiles.forEach { it.delete() }
+                                    true
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                    false
                                 }
-                                downloadedFiles.forEach { it.delete() }
-                                true
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                                false
+                            }
+
+                            if (combined) {
+                                finalFile = combinedFile
+                            } else {
+                                throw Exception("Combining Failed!")
                             }
                         }
 
-                        if (combined) {
-                            finalFile = combinedFile
+                        finalFileToOpen = finalFile
+
+                        if (autoUnzip) {
+                            currentFileStatus = "Extracting files..."
+                            val extSuccess = extractor.extract(finalFile, finalFile.parentFile)
+                            if (extSuccess) {
+                                currentFileStatus = "Extracted Successfully!"
+                            } else {
+                                throw Exception("Extraction Failed!")
+                            }
                         } else {
-                            currentFileStatus = "Combining Failed!"
+                            currentFileStatus = "Process Complete!"
                         }
+                    } else {
+                        throw Exception("Download Failed! No files received.")
                     }
 
-                    finalFileToOpen = finalFile
-
-
-                    if (autoUnzip && currentFileStatus != "Combining Failed!") {
-                        currentFileStatus = "Extracting files..."
-                        val extSuccess = extractor.extract(finalFile, finalFile.parentFile)
-                        currentFileStatus = if (extSuccess) "Extracted Successfully!" else "Extraction Failed!"
-                    } else if (currentFileStatus != "Combining Failed!") {
-                        currentFileStatus = "Process Complete!"
-                    }
-                } else {
-                    currentFileStatus = "Download Failed!"
+                } catch (e: Exception) {
+                    currentFileStatus = "Error: ${e.message}"
+                } finally {
+                    isDownloading = false
+                    downloadFinished = true
                 }
-
-                isDownloading = false
-                downloadFinished = true
             }
         } else {
-            currentFileStatus = "Storage Permission Denied!"
+            currentFileStatus = "Error: Storage Permission Denied!"
         }
     }
 
@@ -226,7 +231,10 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                 }
             }
 
-            if (downloadFinished) {
+            // Check if status is a success state to show the File Manager button
+            val isSuccessState = currentFileStatus == "Process Complete!" || currentFileStatus == "Extracted Successfully!"
+
+            if (downloadFinished && isSuccessState) {
                 Button(
                     onClick = { openFileManagerSafe(context, autoUnzip, finalFileToOpen) },
                     modifier = Modifier.fillMaxWidth(),
@@ -238,13 +246,13 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
         }
     }
 
-    if (showProxyDialog && proxyConfig != null) {
-        ProxyDialog(
-            currentConfig = proxyConfig!!,
+    if (showProxyDialog && appConfig != null) {
+        SettingsDialog(
+            currentConfig = appConfig!!,
             onDismiss = { showProxyDialog = false },
-            onSave = { enabled, ip, port ->
+            onSave = { enabled, ip, port, threads ->
                 scope.launch {
-                    proxyDataStore.saveProxyConfig(enabled, ip, port)
+                    proxyDataStore.saveProxyConfig(enabled, ip, port, threads)
                     showProxyDialog = false
                 }
             }
@@ -253,19 +261,20 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
 }
 
 @Composable
-fun ProxyDialog(
-    currentConfig: com.arshiacomplus.rgit.data.preferences.ProxyConfig,
+fun SettingsDialog(
+    currentConfig: com.arshiacomplus.rgit.data.preferences.AppConfig,
     onDismiss: () -> Unit,
-    onSave: (Boolean, String, Int) -> Unit
+    onSave: (Boolean, String, Int, Int) -> Unit
 ) {
     var isEnabled by remember { mutableStateOf(currentConfig.isEnabled) }
     var ip by remember { mutableStateOf(currentConfig.ip) }
     var port by remember { mutableStateOf(currentConfig.port.toString()) }
+    var threads by remember { mutableStateOf(currentConfig.threads.toFloat()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = GhSurface,
-        title = { Text("Proxy Settings", color = GhTextPrimary) },
+        title = { Text("Settings", color = GhTextPrimary) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -284,10 +293,24 @@ fun ProxyDialog(
                     label = { Text("Port") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Concurrent Downloads: ${threads.toInt()}", color = GhTextPrimary)
+                Slider(
+                    value = threads,
+                    onValueChange = { threads = it },
+                    valueRange = 1f..8f,
+                    steps = 6,
+                    colors = SliderDefaults.colors(
+                        thumbColor = GhButtonBlue,
+                        activeTrackColor = GhButtonBlue
+                    )
+                )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(isEnabled, ip, port.toIntOrNull() ?: 10808) }) {
+            TextButton(onClick = {
+                onSave(isEnabled, ip, port.toIntOrNull() ?: 10808, threads.toInt())
+            }) {
                 Text("Save", color = GhButtonBlue)
             }
         },
@@ -301,7 +324,6 @@ fun ProxyDialog(
 
 private fun openFileManagerSafe(context: Context, autoUnzip: Boolean, targetFile: File?) {
     try {
-
         val builder = StrictMode.VmPolicy.Builder()
         StrictMode.setVmPolicy(builder.build())
 
@@ -315,8 +337,12 @@ private fun openFileManagerSafe(context: Context, autoUnzip: Boolean, targetFile
             intent.setDataAndType(uri, mimeType)
             context.startActivity(intent)
         } else {
-            val folderUri = android.net.Uri.parse("content://com.android.externalstorage.documents/document/primary:Download%2FrgiT")
-            intent.setDataAndType(folderUri, "vnd.android.document/directory")
+            val downloadDir = File(
+                android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
+                "rgiT"
+            )
+            val uri = android.net.Uri.fromFile(downloadDir)
+            intent.setDataAndType(uri, "*/*")
             context.startActivity(intent)
         }
     } catch (e: Exception) {
