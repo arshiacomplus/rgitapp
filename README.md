@@ -42,7 +42,7 @@ If your downloads are restricted or blocked:
 
 ## 📁 Where are my files?
 All your downloaded and extracted files are safely stored in your device's public Downloads folder:
-`Internal Storage/Download/rgiT`
+`Internal Storage/Download/Rgit`
 
 ---
 *Built with ❤️ for bypassing limits and simplifying downloads.*
