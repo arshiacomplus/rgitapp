@@ -11,6 +11,11 @@ on:
         description: 'Release notes (Use \n for new lines)'
         required: true
         default: 'Automated release'
+      is_prerelease:
+        description: 'Mark as Pre-release'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -107,4 +112,4 @@ jobs:
           body_path: release_notes.txt
           files: artifacts/*.apk
           draft: false
-          prerelease: false
+          prerelease: ${{ github.event.inputs.is_prerelease }}
