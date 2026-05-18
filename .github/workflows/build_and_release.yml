@@ -28,7 +28,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.4'
-      
+
       - name: Decode Keystore
         run: echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > rgit-release.jks
 
@@ -72,13 +72,23 @@ jobs:
           name: release-apks
           path: artifacts
 
+      - name: Format Release Notes
+        run: |
+          # Replace the pipe character '|' with a real newline
+          # This allows you to write notes like: "Feature A|Feature B|Fix C"
+          INPUT_BODY="${{ github.event.inputs.release_body }}"
+          FORMATTED_BODY=$(echo "$INPUT_BODY" | sed 's/|/\n/g')
+
+          # Store the result in a temporary file (to preserve multiline)
+          echo "$FORMATTED_BODY" > release_notes.txt
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.event.inputs.tag_name }}
           name: Release ${{ github.event.inputs.tag_name }}
-          body: ${{ github.event.inputs.release_body }}
+          body_path: release_notes.txt
           files: artifacts/*.apk
           draft: false
           prerelease: false
