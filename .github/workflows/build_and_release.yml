@@ -73,15 +73,13 @@ jobs:
           path: artifacts
 
       - name: Format Release Notes
+        shell: bash
         run: |
-          # Replace the pipe character '|' with a real newline
-          # This allows you to write notes like: "Feature A|Feature B|Fix C"
-          INPUT_BODY="${{ github.event.inputs.release_body }}"
-          FORMATTED_BODY=$(echo "$INPUT_BODY" | sed 's/|/\n/g')
+          cat << 'EOF' > release_notes_raw.txt
+          ${{ github.event.inputs.release_body }}
+          EOF
 
-          # Store the result in a temporary file (to preserve multiline)
-          echo "$FORMATTED_BODY" > release_notes.txt
-
+          sed 's/|/\n/g' release_notes_raw.txt > release_notes.txt
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
