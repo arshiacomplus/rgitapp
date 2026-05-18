@@ -69,7 +69,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
 
             scope.launch {
                 try {
-                    val downloader = RGitDownloader()
+
                     val extractor = ZipExtractor()
                     val count = if (isSplit) partsCount.toIntOrNull() ?: 1 else 1
 
@@ -88,8 +88,9 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                         )
                         listOf(resultFile)
                     } else {
-                        val downloader = RGitDownloader()
-                        downloader.startDownload(
+
+                        val directDownloader = RGitDownloader()
+                        directDownloader.startDownload(
                             originalUrl = url,
                             partsCount = count,
                             appConfig = appConfig ?: throw Exception("Config not loaded"),
@@ -107,7 +108,10 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                             currentFileStatus = "Combining parts..."
                             val regex = Regex("\\.\\d{3,}\$")
                             val baseName = finalFile.name.replace(regex, "")
-                            val combinedFile = File(finalFile.parentFile, baseName)
+
+
+                            val parentDir = finalFile.parentFile ?: Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                            val combinedFile = File(parentDir, baseName)
 
                             val combined = withContext(Dispatchers.IO) {
                                 try {
@@ -137,7 +141,11 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
 
                         if (autoUnzip) {
                             currentFileStatus = "Extracting files..."
-                            val extSuccess = extractor.extract(finalFile, finalFile.parentFile)
+
+
+                            val parentDir = finalFile.parentFile ?: Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                            val extSuccess = extractor.extract(finalFile, parentDir)
+
                             if (extSuccess) {
                                 currentFileStatus = "Extracted Successfully!"
                             } else {
@@ -351,7 +359,7 @@ fun SettingsDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
-                    value = repoUrlState, // * Use the state variable
+                    value = repoUrlState,
                     onValueChange = { repoUrlState = it },
                     label = { Text("Default Git Repo URL") }
                 )
