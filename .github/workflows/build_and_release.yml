@@ -74,7 +74,7 @@ jobs:
 
       - name: Rename APKs
         env:
-          APP_NAME: "MyAppName"
+          APP_NAME: "rgit"
           TAG_NAME: ${{ github.event.inputs.tag_name }}
         run: |
           cd artifacts
