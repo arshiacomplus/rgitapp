@@ -110,7 +110,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                             val baseName = finalFile.name.replace(regex, "")
 
 
-                            val parentDir = finalFile.parentFile ?: Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                            val parentDir = finalFile.parentFile ?: android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
                             val combinedFile = File(parentDir, baseName)
 
                             val combined = withContext(Dispatchers.IO) {
@@ -143,7 +143,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                             currentFileStatus = "Extracting files..."
 
 
-                            val parentDir = finalFile.parentFile ?: Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                            val parentDir = finalFile.parentFile ?: android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
                             val extSuccess = extractor.extract(finalFile, parentDir)
 
                             if (extSuccess) {
