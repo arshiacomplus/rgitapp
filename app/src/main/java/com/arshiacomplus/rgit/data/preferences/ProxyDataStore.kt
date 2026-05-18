@@ -18,6 +18,7 @@ class ProxyDataStore(private val context: Context) {
         val PROXY_PORT = intPreferencesKey("proxy_port")
         val THREAD_COUNT = intPreferencesKey("thread_count")
         val REPO_URL = stringPreferencesKey("repo_url")
+        val GITHUB_TOKEN = stringPreferencesKey("github_token")
     }
 
     val proxySettingsFlow: Flow<AppConfig> = context.dataStore.data
@@ -27,19 +28,21 @@ class ProxyDataStore(private val context: Context) {
                 ip = preferences[PROXY_IP] ?: "127.0.0.1",
                 port = preferences[PROXY_PORT] ?: 10808,
                 threads = preferences[THREAD_COUNT] ?: 4,
-                repoUrl = preferences[REPO_URL] ?: ""
+                repoUrl = preferences[REPO_URL] ?: "",
+                githubToken = preferences[GITHUB_TOKEN] ?: ""
             )
         }
 
-    suspend fun saveProxyConfig(isEnabled: Boolean, ip: String, port: Int, threads: Int, repoUrl: String) {
+    suspend fun saveProxyConfig(isEnabled: Boolean, ip: String, port: Int, threads: Int, repoUrl: String, githubToken: String) {
         context.dataStore.edit { preferences ->
             preferences[PROXY_ENABLED] = isEnabled
             preferences[PROXY_IP] = ip
             preferences[PROXY_PORT] = port
             preferences[THREAD_COUNT] = threads
             preferences[REPO_URL] = repoUrl
+            preferences[GITHUB_TOKEN] = githubToken
         }
     }
 }
 
-data class AppConfig(val isEnabled: Boolean, val ip: String, val port: Int, val threads: Int, val repoUrl: String)
+data class AppConfig(val isEnabled: Boolean, val ip: String, val port: Int, val threads: Int, val repoUrl: String, val githubToken: String)

@@ -313,10 +313,9 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
         SettingsDialog(
             currentConfig = appConfig!!,
             onDismiss = { showProxyDialog = false },
-            onSave = { enabled, ip, port, threads, savedRepo ->
+            onSave = { enabled, ip, port, threads, savedRepo, savedToken ->
                 scope.launch {
-                    proxyDataStore.saveProxyConfig(enabled, ip, port, threads, savedRepo)
-                    repoUrl = savedRepo
+                    proxyDataStore.saveProxyConfig(enabled, ip, port, threads, savedRepo, savedToken)
                     showProxyDialog = false
                 }
             }
@@ -328,20 +327,24 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
 fun SettingsDialog(
     currentConfig: com.arshiacomplus.rgit.data.preferences.AppConfig,
     onDismiss: () -> Unit,
-    onSave: (Boolean, String, Int, Int, String) -> Unit
+    onSave: (Boolean, String, Int, Int, String, String) -> Unit
 ) {
     var isEnabled by remember { mutableStateOf(currentConfig.isEnabled) }
     var ip by remember { mutableStateOf(currentConfig.ip) }
     var port by remember { mutableStateOf(currentConfig.port.toString()) }
     var threads by remember { mutableStateOf(currentConfig.threads.toFloat()) }
     var repoUrlState by remember { mutableStateOf(currentConfig.repoUrl) }
+    var githubTokenState by remember { mutableStateOf(currentConfig.githubToken) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = GhSurface,
         title = { Text("Settings", color = GhTextPrimary) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = isEnabled, onCheckedChange = { isEnabled = it })
                     Spacer(modifier = Modifier.width(8.dp))
@@ -363,6 +366,12 @@ fun SettingsDialog(
                     onValueChange = { repoUrlState = it },
                     label = { Text("Default Git Repo URL") }
                 )
+
+                OutlinedTextField(
+                    value = githubTokenState,
+                    onValueChange = { githubTokenState = it },
+                    label = { Text("GitHub Token (PAT) - Optional") }
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Concurrent Downloads: ${threads.toInt()}", color = GhTextPrimary)
                 Slider(
@@ -379,7 +388,7 @@ fun SettingsDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onSave(isEnabled, ip, port.toIntOrNull() ?: 10808, threads.toInt(), repoUrlState)
+                onSave(isEnabled, ip, port.toIntOrNull() ?: 10808, threads.toInt(), repoUrlState, githubTokenState)
             }) {
                 Text("Save", color = GhButtonBlue)
             }
