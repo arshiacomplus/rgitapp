@@ -1,4 +1,5 @@
 package com.arshiacomplus.rgit.ui.screens
+
 import android.Manifest
 import android.app.DownloadManager
 import android.content.Context
@@ -30,35 +31,46 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(proxyDataStore: ProxyDataStore) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
     var url by remember { mutableStateOf("") }
     var isSplit by remember { mutableStateOf(false) }
     var partsCount by remember { mutableStateOf("1") }
     var autoUnzip by remember { mutableStateOf(false) }
+
     var progress by remember { mutableStateOf(0) }
     var currentFileStatus by remember { mutableStateOf("") }
     var isDownloading by remember { mutableStateOf(false) }
     var showProxyDialog by remember { mutableStateOf(false) }
     var downloadFinished by remember { mutableStateOf(false) }
+
+
     var finalFileToOpen by remember { mutableStateOf<File?>(null) }
+
     val proxyConfig by proxyDataStore.proxySettingsFlow.collectAsState(initial = null)
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted || Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+
             isDownloading = true
             downloadFinished = false
             progress = 0
+
             currentFileStatus = "Starting..."
             finalFileToOpen = null
+
             scope.launch {
                 val downloader = RGitDownloader()
                 val extractor = ZipExtractor()
                 val count = if (isSplit) partsCount.toIntOrNull() ?: 1 else 1
+
                 val downloadedFiles = downloader.startDownload(
                     originalUrl = url,
                     partsCount = count,
@@ -68,13 +80,17 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                         currentFileStatus = "Downloading $fileName..."
                     }
                 )
+
                 if (downloadedFiles != null && downloadedFiles.isNotEmpty()) {
                     var finalFile = downloadedFiles.first()
+
+
                     if (isSplit && downloadedFiles.size > 1) {
                         currentFileStatus = "Combining parts..."
-                        val regex = Regex("\\.\\d{3,}\$")
+                        val regex = Regex("\\.\\d{3,}\$") // Removes .001, .002, etc.
                         val baseName = finalFile.name.replace(regex, "")
                         val combinedFile = File(finalFile.parentFile, baseName)
+
                         val combined = withContext(Dispatchers.IO) {
                             try {
                                 FileOutputStream(combinedFile).use { out ->
@@ -91,13 +107,17 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                                 false
                             }
                         }
+
                         if (combined) {
                             finalFile = combinedFile
                         } else {
                             currentFileStatus = "Combining Failed!"
                         }
                     }
+
                     finalFileToOpen = finalFile
+
+
                     if (autoUnzip && currentFileStatus != "Combining Failed!") {
                         currentFileStatus = "Extracting files..."
                         val extSuccess = extractor.extract(finalFile, finalFile.parentFile)
@@ -108,6 +128,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                 } else {
                     currentFileStatus = "Download Failed!"
                 }
+
                 isDownloading = false
                 downloadFinished = true
             }
@@ -115,6 +136,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
             currentFileStatus = "Storage Permission Denied!"
         }
     }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -149,6 +171,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                     unfocusedTextColor = GhTextPrimary
                 )
             )
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = !isSplit, onClick = { isSplit = false })
                 Text("Single File", color = GhTextPrimary)
@@ -156,6 +179,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                 RadioButton(selected = isSplit, onClick = { isSplit = true })
                 Text("Split Parts", color = GhTextPrimary)
             }
+
             if (isSplit) {
                 OutlinedTextField(
                     value = partsCount,
@@ -169,10 +193,12 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                     )
                 )
             }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = autoUnzip, onCheckedChange = { autoUnzip = it })
                 Text("Extract / Unzip after download", color = GhTextPrimary)
             }
+
             Button(
                 onClick = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -187,6 +213,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
             ) {
                 Text("Start Process")
             }
+
             if (isDownloading || downloadFinished) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(currentFileStatus, color = GhTextPrimary)
@@ -198,6 +225,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                     )
                 }
             }
+
             if (downloadFinished) {
                 Button(
                     onClick = { openFileManagerSafe(context, autoUnzip, finalFileToOpen) },
@@ -209,6 +237,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
             }
         }
     }
+
     if (showProxyDialog && proxyConfig != null) {
         ProxyDialog(
             currentConfig = proxyConfig!!,
@@ -222,6 +251,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
         )
     }
 }
+
 @Composable
 fun ProxyDialog(
     currentConfig: com.arshiacomplus.rgit.data.preferences.ProxyConfig,
@@ -231,6 +261,7 @@ fun ProxyDialog(
     var isEnabled by remember { mutableStateOf(currentConfig.isEnabled) }
     var ip by remember { mutableStateOf(currentConfig.ip) }
     var port by remember { mutableStateOf(currentConfig.port.toString()) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = GhSurface,
@@ -267,12 +298,16 @@ fun ProxyDialog(
         }
     )
 }
+
 private fun openFileManagerSafe(context: Context, autoUnzip: Boolean, targetFile: File?) {
     try {
+
         val builder = StrictMode.VmPolicy.Builder()
         StrictMode.setVmPolicy(builder.build())
+
         val intent = Intent(Intent.ACTION_VIEW)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+
         if (autoUnzip && targetFile != null) {
             val uri = android.net.Uri.fromFile(targetFile)
             val extension = android.webkit.MimeTypeMap.getFileExtensionFromUrl(uri.toString())
@@ -280,7 +315,7 @@ private fun openFileManagerSafe(context: Context, autoUnzip: Boolean, targetFile
             intent.setDataAndType(uri, mimeType)
             context.startActivity(intent)
         } else {
-            val folderUri = android.net.Uri.parse("content:
+            val folderUri = android.net.Uri.parse("content://com.android.externalstorage.documents/document/primary:Download%2FrgiT")
             intent.setDataAndType(folderUri, "vnd.android.document/directory")
             context.startActivity(intent)
         }
