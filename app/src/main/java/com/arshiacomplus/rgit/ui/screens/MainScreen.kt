@@ -39,6 +39,9 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
     val scope = rememberCoroutineScope()
 
     var url by remember { mutableStateOf("") }
+    var repoUrl by remember { mutableStateOf("") }
+    var filePath by remember { mutableStateOf("") }
+    var isGithubMitmMode by remember { mutableStateOf(true) }
     var isSplit by remember { mutableStateOf(false) }
     var partsCount by remember { mutableStateOf("1") }
     var autoUnzip by remember { mutableStateOf(false) }
@@ -70,15 +73,32 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                     val extractor = ZipExtractor()
                     val count = if (isSplit) partsCount.toIntOrNull() ?: 1 else 1
 
-                    val downloadedFiles = downloader.startDownload(
-                        originalUrl = url,
-                        partsCount = count,
-                        appConfig = appConfig ?: throw Exception("Config not loaded"),
-                        onProgress = { p, fileName ->
-                            progress = p
-                            currentFileStatus = "Downloading $fileName..."
-                        }
-                    )
+                    val downloadedFiles = if (isGithubMitmMode) {
+                        val mitmDownloader = com.arshiacomplus.rgit.core.downloader.GitMitmDownloader()
+                        val tempDir = File(context.cacheDir, "git_temp")
+                        val resultFile = mitmDownloader.startDownload(
+                            repoUrl = appConfig?.repoUrl?.takeIf { it.isNotBlank() } ?: throw Exception("Repo URL is empty in Settings!"),
+                            filePath = filePath,
+                            appConfig = appConfig!!,
+                            tempDir = tempDir,
+                            onProgress = { p, statusMsg ->
+                                progress = p
+                                currentFileStatus = statusMsg
+                            }
+                        )
+                        listOf(resultFile)
+                    } else {
+                        val downloader = RGitDownloader()
+                        downloader.startDownload(
+                            originalUrl = url,
+                            partsCount = count,
+                            appConfig = appConfig ?: throw Exception("Config not loaded"),
+                            onProgress = { p, fileName ->
+                                progress = p
+                                currentFileStatus = "Downloading $fileName..."
+                            }
+                        )
+                    }
 
                     if (downloadedFiles.isNotEmpty()) {
                         var finalFile = downloadedFiles.first()
@@ -164,18 +184,47 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            OutlinedTextField(
-                value = url,
-                onValueChange = { url = it },
-                label = { Text("Raw Link / First Split Link") },
-                modifier = Modifier.fillMaxWidth(),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = GhSurface,
-                    unfocusedContainerColor = GhSurface,
-                    focusedTextColor = GhTextPrimary,
-                    unfocusedTextColor = GhTextPrimary
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(
+                    checked = isGithubMitmMode,
+                    onCheckedChange = { isGithubMitmMode = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = GhTextPrimary,
+                        checkedTrackColor = GhButtonPrimary
+                    )
                 )
-            )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Use GitHub MITM Mode", color = GhTextPrimary)
+            }
+
+            if (isGithubMitmMode) {
+                OutlinedTextField(
+                    value = filePath,
+                    onValueChange = { filePath = it },
+                    label = { Text("File Path in Repo (e.g., dl/movie.mp4)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = GhSurface,
+                        unfocusedContainerColor = GhSurface,
+                        focusedTextColor = GhTextPrimary,
+                        unfocusedTextColor = GhTextPrimary
+                    )
+                )
+            } else {
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("Raw Link / First Split Link") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = GhSurface,
+                        unfocusedContainerColor = GhSurface,
+                        focusedTextColor = GhTextPrimary,
+                        unfocusedTextColor = GhTextPrimary
+                    )
+                )
+            }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = !isSplit, onClick = { isSplit = false })
@@ -204,6 +253,12 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                 Text("Extract / Unzip after download", color = GhTextPrimary)
             }
 
+            val isInputValid = if (isGithubMitmMode) {
+                filePath.isNotEmpty() && appConfig?.repoUrl?.isNotEmpty() == true
+            } else {
+                url.isNotEmpty()
+            }
+
             Button(
                 onClick = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -213,7 +268,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = url.isNotEmpty() && !isDownloading,
+                enabled = isInputValid && !isDownloading,
                 colors = ButtonDefaults.buttonColors(containerColor = GhButtonPrimary)
             ) {
                 Text("Start Process")
@@ -231,7 +286,7 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
                 }
             }
 
-            // Check if status is a success state to show the File Manager button
+
             val isSuccessState = currentFileStatus == "Process Complete!" || currentFileStatus == "Extracted Successfully!"
 
             if (downloadFinished && isSuccessState) {
@@ -250,9 +305,9 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
         SettingsDialog(
             currentConfig = appConfig!!,
             onDismiss = { showProxyDialog = false },
-            onSave = { enabled, ip, port, threads ->
+            onSave = { enabled, ip, port, threads, savedRepo ->
                 scope.launch {
-                    proxyDataStore.saveProxyConfig(enabled, ip, port, threads)
+                    proxyDataStore.saveProxyConfig(enabled, ip, port, threads, savedRepo)
                     showProxyDialog = false
                 }
             }
@@ -264,12 +319,13 @@ fun MainScreen(proxyDataStore: ProxyDataStore) {
 fun SettingsDialog(
     currentConfig: com.arshiacomplus.rgit.data.preferences.AppConfig,
     onDismiss: () -> Unit,
-    onSave: (Boolean, String, Int, Int) -> Unit
+    onSave: (Boolean, String, Int, Int, String) -> Unit
 ) {
     var isEnabled by remember { mutableStateOf(currentConfig.isEnabled) }
     var ip by remember { mutableStateOf(currentConfig.ip) }
     var port by remember { mutableStateOf(currentConfig.port.toString()) }
     var threads by remember { mutableStateOf(currentConfig.threads.toFloat()) }
+    // var repoUrl by remember { mutableStateOf(currentConfig.repoUrl) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -293,6 +349,11 @@ fun SettingsDialog(
                     label = { Text("Port") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
+                OutlinedTextField(
+                    value = repoUrl,
+                    onValueChange = { repoUrl = it },
+                    label = { Text("Default Git Repo URL") }
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Concurrent Downloads: ${threads.toInt()}", color = GhTextPrimary)
                 Slider(
@@ -309,7 +370,7 @@ fun SettingsDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onSave(isEnabled, ip, port.toIntOrNull() ?: 10808, threads.toInt())
+                onSave(isEnabled, ip, port.toIntOrNull() ?: 10808, threads.toInt(), repoUrl)
             }) {
                 Text("Save", color = GhButtonBlue)
             }

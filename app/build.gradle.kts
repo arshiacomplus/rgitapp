@@ -59,4 +59,6 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("net.lingala.zip4j:zip4j:2.11.5")
+    // * Git Core Dependency
+    implementation("org.eclipse.jgit:org.eclipse.jgit:6.8.0.202311291450-r")
 }
